@@ -24,7 +24,14 @@ your files stay on your device the whole time.
 - Drag-and-drop or click-to-browse, multiple files at once
 - Converts `.m4a` / `.caf` / `.mp4` / `.wav` → MP3 (VBR ~190kbps, `-qscale:a 2`)
 - Per-file progress, download individually when done
-- 100% client-side — works offline after the first load, nothing is ever transmitted
+- **Date-tagged output** — the original recording's timestamp is written into the MP3's ID3
+  tags (title/date/comment), so downloaded files are sortable instead of all being named
+  "New Recording 47"
+- **Optional local transcription** — generate an English `.txt` transcript alongside the MP3,
+  powered by a Whisper model running fully in-browser (no server, no API key)
+- **Installable PWA** — "Add to Home Screen" / "Install app" for an offline-capable app shell;
+  the ffmpeg and transcription engines are cached after first use
+- 100% client-side — nothing is ever transmitted anywhere
 
 ## Development
 
