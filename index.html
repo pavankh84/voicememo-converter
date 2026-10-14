@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Convert iPhone Voice Memos (.m4a) to MP3 entirely in your browser. No uploads, no servers." />
+    <title>Voice Memo → MP3</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="header">
+        <h1>Voice Memo → MP3</h1>
+        <p class="tagline">
+          Drag in your iPhone voice memos. Get MP3s back. Nothing ever leaves your browser.
+        </p>
+      </header>
+
+      <main>
+        <label id="dropzone" for="file-input" class="dropzone">
+          <input
+            id="file-input"
+            type="file"
+            accept=".m4a,.caf,.mp4,.wav,audio/*"
+            multiple
+            hidden
+          />
+          <div class="dropzone-content">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 16V4M12 4L7 9M12 4L17 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M4 16V18C4 19.1046 4.89543 20 6 20H18C19.1046 20 20 19.1046 20 18V16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <p><strong>Drop voice memo files here</strong> or click to browse</p>
+            <p class="hint">.m4a · .caf · .mp4 · .wav</p>
+          </div>
+        </label>
+
+        <div id="file-list" class="file-list" aria-live="polite"></div>
+
+        <div id="actions" class="actions" hidden>
+          <button id="convert-all" class="btn btn-primary">Convert all</button>
+          <button id="clear-all" class="btn btn-secondary">Clear</button>
+        </div>
+
+        <p id="status" class="status" aria-live="polite"></p>
+      </main>
+
+      <footer class="footer">
+        <p>
+          Open source &middot;
+          <a href="https://github.com/pavankh84/voicememo-converter" target="_blank" rel="noopener">
+            View on GitHub
+          </a>
+          &middot; MIT licensed
+        </p>
+        <p class="privacy-note">
+          🔒 Conversion runs locally in your browser using WebAssembly (ffmpeg.wasm). Your audio
+          is never uploaded anywhere.
+        </p>
+      </footer>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
