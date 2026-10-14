@@ -29,6 +29,8 @@ your files stay on your device the whole time.
   "New Recording 47"
 - **Optional local transcription** — generate an English `.txt` transcript alongside the MP3,
   powered by a Whisper model running fully in-browser (no server, no API key)
+- **Optional silence trimming** — strips dead air from the start and end of a recording
+  (ffmpeg `silenceremove`, threshold -45dB) without touching pauses mid-recording
 - **Installable PWA** — "Add to Home Screen" / "Install app" for an offline-capable app shell;
   the ffmpeg and transcription engines are cached after first use
 - 100% client-side — nothing is ever transmitted anywhere

@@ -25,6 +25,15 @@ const CORE_VERSION = "0.12.6";
 const CORE_BASE_URL = `https://unpkg.com/@ffmpeg/core@${CORE_VERSION}/dist/esm`;
 const ASR_MODEL = "Xenova/whisper-tiny.en";
 
+// Trims leading AND trailing silence (below -45dB) without touching pauses in the
+// middle of the recording. The reverse/un-reverse trick is the standard ffmpeg way
+// to apply silenceremove to both ends since the filter only strips from the start.
+const SILENCE_TRIM_FILTER =
+  "silenceremove=start_periods=1:start_duration=0:start_threshold=-45dB:detection=peak," +
+  "aformat=dblp,areverse," +
+  "silenceremove=start_periods=1:start_duration=0:start_threshold=-45dB:detection=peak," +
+  "aformat=dblp,areverse";
+
 const dropzone = document.getElementById("dropzone") as HTMLLabelElement;
 const fileInput = document.getElementById("file-input") as HTMLInputElement;
 const fileListEl = document.getElementById("file-list") as HTMLDivElement;
@@ -33,6 +42,7 @@ const convertAllBtn = document.getElementById("convert-all") as HTMLButtonElemen
 const clearAllBtn = document.getElementById("clear-all") as HTMLButtonElement;
 const statusEl = document.getElementById("status") as HTMLParagraphElement;
 const transcribeToggle = document.getElementById("transcribe-toggle") as HTMLInputElement;
+const trimToggle = document.getElementById("trim-toggle") as HTMLInputElement;
 
 let queue: QueueItem[] = [];
 let ffmpeg: FFmpeg | null = null;
@@ -187,6 +197,7 @@ async function convertItem(item: QueueItem) {
   render();
 
   const engine = await getFFmpeg();
+  const trim = trimToggle.checked;
 
   const inputName = `input-${item.id}${getExt(item.file.name)}`;
   const outputName = `${baseName(item.file.name)}.mp3`;
@@ -205,9 +216,11 @@ async function convertItem(item: QueueItem) {
     // Tag the MP3 with the original recording's date so it's not just "New Recording 47".
     const recordedAt = new Date(item.file.lastModified || Date.now());
     const isoDate = recordedAt.toISOString().slice(0, 10);
+    const audioFilterArgs = trim ? ["-af", SILENCE_TRIM_FILTER] : [];
     await engine.exec([
       "-i",
       inputName,
+      ...audioFilterArgs,
       "-codec:a",
       "libmp3lame",
       "-qscale:a",
@@ -232,7 +245,7 @@ async function convertItem(item: QueueItem) {
     render();
 
     if (transcribeToggle.checked) {
-      await transcribeItem(item, engine, inputName, wavVirtualName);
+      await transcribeItem(item, engine, inputName, wavVirtualName, trim);
     }
   } catch (err) {
     item.status = "error";
@@ -251,13 +264,27 @@ async function transcribeItem(
   engine: FFmpeg,
   inputName: string,
   wavVirtualName: string,
+  trim: boolean,
 ) {
   item.status = "transcribing";
   render();
 
   try {
     // Re-decode the original audio to 16kHz mono PCM, the format Whisper expects.
-    await engine.exec(["-i", inputName, "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", wavVirtualName]);
+    // Apply the same silence trim as the MP3 output so the transcript lines up.
+    const audioFilterArgs = trim ? ["-af", SILENCE_TRIM_FILTER] : [];
+    await engine.exec([
+      "-i",
+      inputName,
+      ...audioFilterArgs,
+      "-ar",
+      "16000",
+      "-ac",
+      "1",
+      "-c:a",
+      "pcm_s16le",
+      wavVirtualName,
+    ]);
     const wavData = await engine.readFile(wavVirtualName);
     const wavBytes = (wavData as Uint8Array).slice();
     const samples = await decodeTo16kMono(wavBytes.buffer);

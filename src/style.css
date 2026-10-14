@@ -227,6 +227,12 @@ body {
   cursor: pointer;
 }
 
+.option-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .transcribe-toggle input {
   accent-color: var(--accent);
 }

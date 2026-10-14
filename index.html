@@ -37,10 +37,16 @@
 
         <div id="file-list" class="file-list" aria-live="polite"></div>
 
-        <label class="transcribe-toggle">
-          <input id="transcribe-toggle" type="checkbox" />
-          Also generate a transcript (English, runs locally — first use downloads a ~40MB model)
-        </label>
+        <div class="option-row">
+          <label class="transcribe-toggle">
+            <input id="trim-toggle" type="checkbox" />
+            Trim silence (removes dead air from the start/end)
+          </label>
+          <label class="transcribe-toggle">
+            <input id="transcribe-toggle" type="checkbox" />
+            Also generate a transcript (English, runs locally — first use downloads a ~40MB model)
+          </label>
+        </div>
 
         <div id="actions" class="actions" hidden>
           <button id="convert-all" class="btn btn-primary">Convert all</button>
