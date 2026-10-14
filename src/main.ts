@@ -23,7 +23,9 @@ interface QueueItem {
 
 const CORE_VERSION = "0.12.6";
 const CORE_BASE_URL = `https://unpkg.com/@ffmpeg/core@${CORE_VERSION}/dist/esm`;
-const ASR_MODEL = "Xenova/whisper-tiny.en";
+// Multilingual tiny model (same size class as the English-only one) so a single
+// default download covers every supported language via the picker below.
+const ASR_MODEL = "Xenova/whisper-tiny";
 
 // Trims leading AND trailing silence (below -45dB) without touching pauses in the
 // middle of the recording. The reverse/un-reverse trick is the standard ffmpeg way
@@ -43,6 +45,12 @@ const clearAllBtn = document.getElementById("clear-all") as HTMLButtonElement;
 const statusEl = document.getElementById("status") as HTMLParagraphElement;
 const transcribeToggle = document.getElementById("transcribe-toggle") as HTMLInputElement;
 const trimToggle = document.getElementById("trim-toggle") as HTMLInputElement;
+const languageRow = document.getElementById("language-row") as HTMLLabelElement;
+const languageSelect = document.getElementById("language-select") as HTMLSelectElement;
+
+transcribeToggle.addEventListener("change", () => {
+  languageRow.hidden = !transcribeToggle.checked;
+});
 
 let queue: QueueItem[] = [];
 let ffmpeg: FFmpeg | null = null;
@@ -290,7 +298,12 @@ async function transcribeItem(
     const samples = await decodeTo16kMono(wavBytes.buffer);
 
     const transcriber = await getAsrPipeline();
-    const result = await transcriber(samples, { chunk_length_s: 30, stride_length_s: 5 });
+    const language = languageSelect.value;
+    const result = await transcriber(samples, {
+      chunk_length_s: 30,
+      stride_length_s: 5,
+      language,
+    });
     const text = (Array.isArray(result) ? result[0]?.text : result.text)?.trim() ?? "";
 
     const transcriptBlob = new Blob([text], { type: "text/plain" });

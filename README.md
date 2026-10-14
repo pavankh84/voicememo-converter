@@ -27,8 +27,11 @@ your files stay on your device the whole time.
 - **Date-tagged output** — the original recording's timestamp is written into the MP3's ID3
   tags (title/date/comment), so downloaded files are sortable instead of all being named
   "New Recording 47"
-- **Optional local transcription** — generate an English `.txt` transcript alongside the MP3,
-  powered by a Whisper model running fully in-browser (no server, no API key)
+- **Optional local transcription** — generate a `.txt` transcript alongside the MP3, powered by
+  a multilingual Whisper model running fully in-browser (no server, no API key). Pick the
+  spoken language from a dropdown (English, Hindi, Spanish, French, German, Chinese, Japanese,
+  Arabic, Portuguese, Russian) — accuracy is best for single-language audio; code-switched
+  recordings (e.g. Hindi mixed with English) are transcribed less reliably
 - **Optional silence trimming** — strips dead air from the start and end of a recording
   (ffmpeg `silenceremove`, threshold -45dB) without touching pauses mid-recording
 - **Installable PWA** — "Add to Home Screen" / "Install app" for an offline-capable app shell;

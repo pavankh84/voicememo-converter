@@ -233,6 +233,28 @@ body {
   gap: 8px;
 }
 
+.language-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  padding-left: 24px;
+}
+
+.language-row[hidden] {
+  display: none;
+}
+
+.language-row select {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+}
+
 .transcribe-toggle input {
   accent-color: var(--accent);
 }
