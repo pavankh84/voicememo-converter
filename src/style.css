@@ -152,6 +152,11 @@ body {
   gap: 12px;
 }
 
+.actions[hidden],
+.btn[hidden] {
+  display: none;
+}
+
 .btn {
   border: none;
   border-radius: 8px;
@@ -187,6 +192,11 @@ body {
 
 .btn-secondary:hover {
   border-color: var(--text-muted);
+}
+
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn-small {
@@ -231,6 +241,13 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  margin-bottom: 16px;
+}
+
+.option-hint {
+  margin: 0 0 2px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
 }
 
 .language-row {

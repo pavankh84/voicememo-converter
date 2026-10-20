@@ -21,7 +21,7 @@ your files stay on your device the whole time.
 
 ## Features
 
-- Drag-and-drop or click-to-browse, multiple files at once
+- Drag-and-drop or click-to-browse, multiple files at once; conversion starts automatically
 - Converts `.m4a` / `.caf` / `.mp4` / `.wav` → MP3 (VBR ~190kbps, `-qscale:a 2`)
 - Per-file progress, download individually when done
 - **Date-tagged output** — the original recording's timestamp is written into the MP3's ID3

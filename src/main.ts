@@ -6,13 +6,23 @@ import {
   type AutomaticSpeechRecognitionPipeline,
 } from "@huggingface/transformers";
 
-type Status = "pending" | "converting" | "transcribing" | "done" | "error";
+type Status =
+  | "pending"
+  | "loading-engine"
+  | "converting"
+  | "loading-transcriber"
+  | "transcribing"
+  | "done"
+  | "error";
 
 interface QueueItem {
   id: string;
   file: File;
   status: Status;
   progress: number; // 0-100
+  trimSilence: boolean;
+  transcribe: boolean;
+  language: string;
   outputUrl?: string;
   outputName?: string;
   transcriptUrl?: string;
@@ -40,7 +50,7 @@ const dropzone = document.getElementById("dropzone") as HTMLLabelElement;
 const fileInput = document.getElementById("file-input") as HTMLInputElement;
 const fileListEl = document.getElementById("file-list") as HTMLDivElement;
 const actionsEl = document.getElementById("actions") as HTMLDivElement;
-const convertAllBtn = document.getElementById("convert-all") as HTMLButtonElement;
+const retryFailedBtn = document.getElementById("retry-failed") as HTMLButtonElement;
 const clearAllBtn = document.getElementById("clear-all") as HTMLButtonElement;
 const statusEl = document.getElementById("status") as HTMLParagraphElement;
 const transcribeToggle = document.getElementById("transcribe-toggle") as HTMLInputElement;
@@ -57,12 +67,12 @@ let ffmpeg: FFmpeg | null = null;
 let ffmpegLoading: Promise<FFmpeg> | null = null;
 let asrPipeline: AutomaticSpeechRecognitionPipeline | null = null;
 let asrLoading: Promise<AutomaticSpeechRecognitionPipeline> | null = null;
+let processingPromise: Promise<void> | null = null;
 
-function getFFmpeg(): Promise<FFmpeg> {
+async function getFFmpeg(): Promise<FFmpeg> {
   if (ffmpeg) return Promise.resolve(ffmpeg);
   if (ffmpegLoading) return ffmpegLoading;
 
-  statusEl.textContent = "Loading converter engine (first time only, ~30MB)…";
   ffmpegLoading = (async () => {
     const instance = new FFmpeg();
     instance.on("log", ({ message }) => {
@@ -74,24 +84,29 @@ function getFFmpeg(): Promise<FFmpeg> {
     const wasmURL = await toBlobURL(`${CORE_BASE_URL}/ffmpeg-core.wasm`, "application/wasm");
     await instance.load({ coreURL, wasmURL });
     ffmpeg = instance;
-    statusEl.textContent = "";
     return instance;
   })();
-  return ffmpegLoading;
+  try {
+    return await ffmpegLoading;
+  } finally {
+    if (!ffmpeg) ffmpegLoading = null;
+  }
 }
 
-function getAsrPipeline(): Promise<AutomaticSpeechRecognitionPipeline> {
+async function getAsrPipeline(): Promise<AutomaticSpeechRecognitionPipeline> {
   if (asrPipeline) return Promise.resolve(asrPipeline);
   if (asrLoading) return asrLoading;
 
-  statusEl.textContent = "Loading transcription model (first time only, ~40MB)…";
   asrLoading = (async () => {
     const transcriber = await pipeline("automatic-speech-recognition", ASR_MODEL);
     asrPipeline = transcriber;
-    statusEl.textContent = "";
     return transcriber;
   })();
-  return asrLoading;
+  try {
+    return await asrLoading;
+  } finally {
+    if (!asrPipeline) asrLoading = null;
+  }
 }
 
 function makeId(): string {
@@ -118,9 +133,19 @@ function formatBytes(bytes: number): string {
 function addFiles(files: FileList | File[]) {
   const accepted = Array.from(files).filter((f) => f.size > 0);
   for (const file of accepted) {
-    queue.push({ id: makeId(), file, status: "pending", progress: 0 });
+    queue.push({
+      id: makeId(),
+      file,
+      status: "pending",
+      progress: 0,
+      trimSilence: trimToggle.checked,
+      transcribe: transcribeToggle.checked,
+      language: languageSelect.value,
+    });
   }
+  fileInput.value = "";
   render();
+  if (accepted.length > 0) startProcessing();
 }
 
 function render() {
@@ -129,7 +154,52 @@ function render() {
     fileListEl.appendChild(renderItem(item));
   }
   actionsEl.hidden = queue.length === 0;
-  convertAllBtn.disabled = queue.every((q) => q.status !== "pending");
+  const failedCount = queue.filter((q) => q.status === "error").length;
+  retryFailedBtn.hidden = failedCount === 0;
+  retryFailedBtn.textContent = failedCount === 1 ? "Retry failed file" : `Retry ${failedCount} failed files`;
+  clearAllBtn.disabled = processingPromise !== null;
+  renderStatus();
+}
+
+function renderStatus() {
+  const active = queue.find((item) =>
+    ["loading-engine", "converting", "loading-transcriber", "transcribing"].includes(item.status),
+  );
+  if (active?.status === "loading-engine") {
+    statusEl.textContent =
+      "Loading the local converter engine for the first conversion (~30 MB). Your audio stays on this device.";
+    return;
+  }
+  if (active?.status === "converting") {
+    statusEl.textContent = `Converting ${active.file.name} locally…`;
+    return;
+  }
+  if (active?.status === "loading-transcriber") {
+    statusEl.textContent =
+      "Loading the local transcription model for the first transcript (~45 MB)…";
+    return;
+  }
+  if (active?.status === "transcribing") {
+    statusEl.textContent = `Transcribing ${active.file.name} locally…`;
+    return;
+  }
+
+  const pendingCount = queue.filter((item) => item.status === "pending").length;
+  if (pendingCount > 0) {
+    statusEl.textContent = `${pendingCount} ${pendingCount === 1 ? "file" : "files"} queued for automatic local conversion.`;
+    return;
+  }
+
+  const doneCount = queue.filter((item) => item.status === "done").length;
+  const failedCount = queue.filter((item) => item.status === "error").length;
+  if (failedCount > 0) {
+    statusEl.textContent =
+      `${doneCount} completed. ${failedCount} ${failedCount === 1 ? "file" : "files"} failed and can be retried.`;
+  } else if (doneCount > 0) {
+    statusEl.textContent = "Done! Download each converted file below.";
+  } else {
+    statusEl.textContent = "";
+  }
 }
 
 function renderItem(item: QueueItem): HTMLDivElement {
@@ -157,9 +227,13 @@ function renderItem(item: QueueItem): HTMLDivElement {
   action.className = "file-action";
 
   if (item.status === "pending") {
-    action.textContent = "Waiting";
+    action.textContent = "Queued — starts automatically";
+  } else if (item.status === "loading-engine") {
+    action.textContent = "Loading local converter engine…";
   } else if (item.status === "converting") {
     action.textContent = `Converting… ${item.progress}%`;
+  } else if (item.status === "loading-transcriber") {
+    action.textContent = "Loading local transcription model…";
   } else if (item.status === "transcribing") {
     action.textContent = "Transcribing… (can take a while for long memos)";
   } else if (item.status === "error") {
@@ -200,31 +274,31 @@ function renderItem(item: QueueItem): HTMLDivElement {
 }
 
 async function convertItem(item: QueueItem) {
-  item.status = "converting";
+  item.status = "loading-engine";
   item.progress = 0;
   render();
-
-  const engine = await getFFmpeg();
-  const trim = trimToggle.checked;
 
   const inputName = `input-${item.id}${getExt(item.file.name)}`;
   const outputName = `${baseName(item.file.name)}.mp3`;
   const outputVirtualName = `output-${item.id}.mp3`;
   const wavVirtualName = `asr-${item.id}.wav`;
+  let engine: FFmpeg | null = null;
 
   const onProgress = ({ progress }: { progress: number }) => {
     item.progress = Math.min(100, Math.max(0, Math.round(progress * 100)));
     render();
   };
-  engine.on("progress", onProgress);
-
   try {
+    engine = await getFFmpeg();
+    item.status = "converting";
+    render();
+    engine.on("progress", onProgress);
     await engine.writeFile(inputName, await fetchFile(item.file));
 
     // Tag the MP3 with the original recording's date so it's not just "New Recording 47".
     const recordedAt = new Date(item.file.lastModified || Date.now());
     const isoDate = recordedAt.toISOString().slice(0, 10);
-    const audioFilterArgs = trim ? ["-af", SILENCE_TRIM_FILTER] : [];
+    const audioFilterArgs = item.trimSilence ? ["-af", SILENCE_TRIM_FILTER] : [];
     await engine.exec([
       "-i",
       inputName,
@@ -252,17 +326,17 @@ async function convertItem(item: QueueItem) {
     item.progress = 100;
     render();
 
-    if (transcribeToggle.checked) {
-      await transcribeItem(item, engine, inputName, wavVirtualName, trim);
+    if (item.transcribe) {
+      await transcribeItem(item, engine, inputName, wavVirtualName, item.trimSilence, item.language);
     }
   } catch (err) {
     item.status = "error";
     item.error = err instanceof Error ? err.message : "Conversion failed";
   } finally {
-    engine.off("progress", onProgress);
-    await engine.deleteFile(inputName).catch(() => {});
-    await engine.deleteFile(outputVirtualName).catch(() => {});
-    await engine.deleteFile(wavVirtualName).catch(() => {});
+    engine?.off("progress", onProgress);
+    await engine?.deleteFile(inputName).catch(() => {});
+    await engine?.deleteFile(outputVirtualName).catch(() => {});
+    await engine?.deleteFile(wavVirtualName).catch(() => {});
     render();
   }
 }
@@ -273,6 +347,7 @@ async function transcribeItem(
   inputName: string,
   wavVirtualName: string,
   trim: boolean,
+  language: string,
 ) {
   item.status = "transcribing";
   render();
@@ -297,8 +372,11 @@ async function transcribeItem(
     const wavBytes = (wavData as Uint8Array).slice();
     const samples = await decodeTo16kMono(wavBytes.buffer);
 
+    item.status = "loading-transcriber";
+    render();
     const transcriber = await getAsrPipeline();
-    const language = languageSelect.value;
+    item.status = "transcribing";
+    render();
     const result = await transcriber(samples, {
       chunk_length_s: 30,
       stride_length_s: 5,
@@ -344,23 +422,44 @@ function getExt(name: string): string {
   return dot > 0 ? name.slice(dot) : "";
 }
 
-async function convertAll() {
-  convertAllBtn.disabled = true;
-  const pending = queue.filter((q) => q.status === "pending" || q.status === "error");
-  for (const item of pending) {
+async function processQueue() {
+  while (true) {
+    const item = queue.find((candidate) => candidate.status === "pending");
+    if (!item) return;
     await convertItem(item);
   }
-  statusEl.textContent = "Done! Click each file to download.";
+}
+
+function startProcessing() {
+  if (processingPromise) return;
+
+  processingPromise = processQueue().finally(() => {
+    processingPromise = null;
+    render();
+    if (queue.some((item) => item.status === "pending")) startProcessing();
+  });
+  render();
+}
+
+function retryFailed() {
+  for (const item of queue) {
+    if (item.status !== "error") continue;
+    item.status = "pending";
+    item.progress = 0;
+    item.error = undefined;
+  }
+  render();
+  startProcessing();
 }
 
 function clearAll() {
+  if (processingPromise) return;
   for (const item of queue) {
     if (item.outputUrl) URL.revokeObjectURL(item.outputUrl);
     if (item.transcriptUrl) URL.revokeObjectURL(item.transcriptUrl);
   }
   queue = [];
   fileInput.value = "";
-  statusEl.textContent = "";
   render();
 }
 
@@ -386,9 +485,7 @@ fileInput.addEventListener("change", () => {
   if (fileInput.files && fileInput.files.length) addFiles(fileInput.files);
 });
 
-convertAllBtn.addEventListener("click", () => {
-  void convertAll();
-});
+retryFailedBtn.addEventListener("click", retryFailed);
 clearAllBtn.addEventListener("click", clearAll);
 
 render();
