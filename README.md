@@ -54,6 +54,12 @@ Built with [Vite](https://vitejs.dev/) + TypeScript. No framework, no backend.
 Pushing to `main` builds and deploys to GitHub Pages via the included GitHub Actions workflow
 (`.github/workflows/deploy.yml`).
 
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md) for setup and workflow guidance,
+the [Code of Conduct](./CODE_OF_CONDUCT.md), and [SECURITY.md](./SECURITY.md) for private
+vulnerability reporting.
+
 ## License
 
 MIT — see [LICENSE](./LICENSE).
