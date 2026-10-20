@@ -1,0 +1,46 @@
+name: Feature request
+description: Suggest a focused improvement
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion. The project prioritizes simple, private, fully client-side behavior.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or opportunity
+      description: What user need would this address?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Describe the smallest useful solution.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Describe any workarounds or other approaches you considered.
+  - type: dropdown
+    id: network
+    attributes:
+      label: Does this require sending user data over the network?
+      options:
+        - "No"
+        - "Unsure"
+        - "Yes"
+    validations:
+      required: true
+  - type: textarea
+    id: privacy-impact
+    attributes:
+      label: Privacy and security impact
+      description: Explain effects on recordings, transcripts, metadata, storage, dependencies, or network access.
+    validations:
+      required: true
