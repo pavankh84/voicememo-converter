@@ -5,6 +5,8 @@ no account. Your audio never leaves your machine.
 
 **Live:** https://pavankh84.github.io/voicememo-converter/
 
+See the [changelog](./CHANGELOG.md) for release history.
+
 ## Why
 
 Most "convert my voice memo to mp3" tools on the web make you upload a personal recording to a
